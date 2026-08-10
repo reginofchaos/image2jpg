@@ -1,0 +1,6 @@
+# Image2JPG 运行与打包依赖
+# 安装：.venv\Scripts\python.exe -m pip install -r requirements.txt
+Pillow>=10.0.0
+pyinstaller>=6.0.0
+pillow-avif-plugin>=1.4.0
+pillow-heif>=0.15.0

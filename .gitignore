@@ -1,0 +1,21 @@
+# 虚拟环境
+.venv/
+venv/
+
+# PyInstaller 构建缓存
+build/
+*.spec
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 测试残留产物（dist 下的临时输出，非发布内容）
+dist/1.jpg
+dist/1.webp
+test_keep/
+
+# 操作系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.log
