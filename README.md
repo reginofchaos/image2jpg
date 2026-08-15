@@ -27,6 +27,10 @@
 - **转换完成自动打开目录（可选）**：勾选「转换完成后打开输出目录」（或 CLI `--open`）
 - **输出可控**：默认输出到原图同目录；可勾选输出到指定文件夹
 
+## 界面预览
+
+![Image2JPG 主界面](assets/screenshot.png)
+
 ## 运行方式
 
 ### 方式一：双击 exe（推荐，零环境依赖）
@@ -172,6 +176,10 @@ A local desktop app that **batch-converts images between formats with one click 
 - **Keep EXIF (optional)**: when "保留EXIF元数据" is checked (or CLI `--keep-exif`), EXIF is written back to JPG / WEBP / TIFF / HEIC output; auto-rotation is disabled so the original orientation tag is preserved
 - **Auto-open output folder (optional)**: check "转换完成后打开输出目录" (or CLI `--open`)
 - **Controllable output**: defaults to the source folder; can be redirected to a chosen folder
+
+## Screenshot
+
+![Image2JPG main window](assets/screenshot.png)
 
 ## How to run
 
