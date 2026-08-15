@@ -2,15 +2,25 @@
 
 本地运行的桌面小程序，**一键把各种图片格式批量转换为任意目标格式（默认 JPG）**。支持拖入、批量处理、等比缩放、重命名，完全本地运行，无需联网。
 
+> 语言 / Language：**[中文](#中文) · [English](#english)**
+
+---
+
+<span id="中文"></span>
+
+# 中文说明
+
+本地运行的桌面小程序，**一键把各种图片格式批量转换为任意目标格式（默认 JPG）**。支持拖入、批量处理、等比缩放、重命名，完全本地运行，无需联网。
+
 ## 功能特性
 
 - **拖入即转换**：可直接把图片文件或整个文件夹拖进窗口，也支持按钮添加
-- **格式全覆盖（输入）**：jpg / jpeg / png / bmp / gif / webp / tiff / tif / ico / heic / heif（苹果设备照片）/ ppm / pgm / tga 等主流位图
+- **格式全覆盖（输入）**：jpg / jpeg / png / bmp / gif / webp / tiff / tif / ico / heic / heif（苹果设备照片）/ ppm / pgm / tga / avif 等主流位图
 - **输出格式可选（9 种）**：`jpg`（默认）/ `png` / `webp` / `bmp` / `tiff` / `gif` / `ico` / `avif` / `heic`
 - **一键批量**：点一次按钮，整批图片后台转换，带进度条与逐文件状态
 - **等比缩放**：支持「百分比 / 最长边 / 宽度」三种模式，LANCZOS 高质量重采样
 - **重命名**：支持「保留原名 / 加前缀 / 加后缀 / 序号」四种规则
-- **透明自动处理**：目标不支持透明（jpg / bmp / gif）→ 透明区域以白色背景合成；支持透明的目标（png / webp / tiff / ico / avif）→ 保留透明通道
+- **透明自动处理**：目标不支持透明（jpg / bmp / gif）→ 透明区域以白色背景合成；支持透明的目标（png / webp / tiff / ico / avif / heic）→ 保留透明通道
 - **方向自动校正**：手机照片按 EXIF 信息自动转正
 - **质量可调**：jpg / webp / avif / heic 质量 10–100（默认 100）；无损格式自动忽略质量
 - **保留 EXIF（可选）**：勾选「保留EXIF元数据」（或 CLI `--keep-exif`）后写回 JPG / WEBP / TIFF / HEIC 输出；开启时不自动按方向转正，以保留原始方向标签
@@ -139,3 +149,149 @@ AVIF / HEIC 打包必须加 `--hidden-import pillow_avif --hidden-import pillow_
 ## 许可证
 
 基于 MIT 许可证开源，详见 [LICENSE](LICENSE)。
+
+---
+
+<span id="english"></span>
+
+# English
+
+A local desktop app that **batch-converts images between formats with one click (default JPG)**. Supports drag-and-drop, batch processing, proportional resizing, and renaming. Runs 100% locally — no internet required.
+
+## Features
+
+- **Drag & drop**: drop image files or whole folders into the window, or add them with buttons
+- **Full input coverage**: jpg / jpeg / png / bmp / gif / webp / tiff / tif / ico / heic / heif (Apple Photos) / ppm / pgm / tga / avif and other common bitmaps
+- **9 output formats**: `jpg` (default) / `png` / `webp` / `bmp` / `tiff` / `gif` / `ico` / `avif` / `heic`
+- **One-click batch**: convert a whole batch in the background with a progress bar and per-file status
+- **Proportional resize**: percent / longest-edge / width modes, with high-quality LANCZOS resampling
+- **Rename rules**: keep original / add prefix / add suffix / sequence numbering
+- **Automatic transparency handling**: targets without alpha (jpg / bmp / gif) get a white background; alpha-capable targets (png / webp / tiff / ico / avif / heic) keep the alpha channel
+- **Auto orientation**: phone photos are auto-rotated according to EXIF
+- **Adjustable quality**: jpg / webp / avif / heic quality 10–100 (default 100); lossless formats ignore quality
+- **Keep EXIF (optional)**: when "保留EXIF元数据" is checked (or CLI `--keep-exif`), EXIF is written back to JPG / WEBP / TIFF / HEIC output; auto-rotation is disabled so the original orientation tag is preserved
+- **Auto-open output folder (optional)**: check "转换完成后打开输出目录" (or CLI `--open`)
+- **Controllable output**: defaults to the source folder; can be redirected to a chosen folder
+
+## How to run
+
+### Option 1: Double-click the exe (recommended, zero setup)
+
+Double-click `dist/Image2JPG.exe` to open the GUI. No Python installation needed.
+
+> For the command line, use `dist/Image2JPG-CLI.exe` (see "Option 3"). It prints directly to the current terminal with no extra popup.
+
+> AVIF / HEIC output is bundled at build time (includes `pillow-avif-plugin` and `pillow-heif`), so no extra install is needed.
+> Note: HEIC may not preview in some built-in Windows "Photos" viewers, but mainstream viewers/editors open it fine.
+
+### Option 2: Run from source (requires Python + Pillow + tkinter)
+
+```bash
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe image2jpg.py
+# CLI entry point:
+.venv\Scripts\python.exe image2jpg_cli.py input.png -f jpg -o out/
+```
+
+### Option 3: Command line (CLI)
+
+Best for PowerShell, scripts, and CI — no internet required.
+
+#### Using the exe (recommended, zero setup)
+
+```powershell
+# Single file HEIC -> JPG
+.\dist\Image2JPG-CLI.exe photo.heic -f jpg -q 90
+
+# Batch: wildcard + output to out folder
+.\dist\Image2JPG-CLI.exe *.png -f webp --output out\
+
+# Recursively convert a folder, resize longest edge to 1920, prefix rename
+.\dist\Image2JPG-CLI.exe D:\photos\ -f jpg --resize maxedge:1920 --rename prefix:conv_
+
+# Keep original EXIF (applies to JPG/WEBP/TIFF/HEIC; disables auto-rotation)
+.\dist\Image2JPG-CLI.exe D:\photos\ -f jpg --keep-exif
+
+# Open the output folder automatically when done
+.\dist\Image2JPG-CLI.exe D:\photos\ -f png --open
+
+# Output results as JSON for programmatic parsing
+.\dist\Image2JPG-CLI.exe D:\photos\ -f png --json
+```
+
+#### Using the Python source
+
+```bash
+.venv\Scripts\python.exe image2jpg_cli.py input.png -f jpg -o out/
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `inputs` (multiple) | Image files, directories, or wildcards; directories are scanned recursively by default; optional when querying options |
+| `-f, --format` | Output format, default `jpg` (jpg/png/webp/bmp/tiff/gif/ico/avif/heic) |
+| `-q, --quality` | Quality 1–100 for lossy formats, default 100 |
+| `-o, --output` | Output directory (defaults to the source folder) |
+| `-r / --no-recursive` | Whether to scan directories recursively (default: yes) |
+| `--resize MODE:VALUE` | Proportional resize: `percent:50` / `maxedge:1920` / `width:800` |
+| `--rename MODE[:TEXT]` | Rename: `prefix:IMG_` / `suffix:_x` / `sequence:page` / `keep` |
+| `--overwrite` | Overwrite existing output files |
+| `--keep-exif` | Keep source EXIF metadata (JPG/WEBP/TIFF/HEIC; disables auto-rotation) |
+| `--open` | Open the output folder in Explorer when done |
+| `--workers N` | Parallel worker threads (default 1) |
+| `--dry-run` | List the plan only, do not convert |
+| `--quiet` | Quiet mode (errors only) |
+| `--json` | Emit a JSON summary (for machine parsing) |
+| `--list-formats` | Print supported input/output formats and exit |
+
+> Exit codes: `0` on full success; `2` if any file failed or no input matched.
+
+## Usage steps
+
+1. Drag images/folders into the window, or click "添加文件" / "添加文件夹"
+2. Pick the output format (default jpg); drag the quality slider for lossy formats
+3. (Optional) Enable "启用缩放" in the resize/rename area, choose a mode and value (% or px, proportional)
+4. (Optional) Choose a rename mode and enter text (sequence mode numbers files in list order)
+5. (Optional) Check "输出到指定文件夹" and pick a target directory
+6. Click "一键转换为 XXX" and wait for the progress to finish
+
+## File reference
+
+| File | Purpose |
+|------|---------|
+| `image2jpg.py` | GUI app (tkinter), exports `main_gui()`; built into `dist/Image2JPG.exe` |
+| `image2jpg_cli.py` | CLI logic, exports `run_cli()`; built into `dist/Image2JPG-CLI.exe` |
+| `convert_core.py` | Core conversion logic (GUI-free, unit-testable and reusable) |
+| `test_convert.py` | Self-test script (63+ cases: all formats / transparency / resize / rename / custom dir / EXIF) |
+| `dist/Image2JPG.exe` | GUI build: double-click to open, no console window |
+| `dist/Image2JPG-CLI.exe` | CLI build: prints to the current terminal |
+
+## Notes
+
+- Without renaming, the output keeps the original base name (only the extension changes).
+- If the source is already the target format and output is the same folder, it is saved as `<name>_converted.<ext>` to avoid overwriting the original.
+- An existing output file with the same name is overwritten (treated as a leftover from a previous run).
+- With sequence renaming, names look like `text+3-digit` (e.g. `img001.jpg`), incrementing in list order.
+- Animated images (GIF/WEBP) use only the first frame (static targets do not keep animation).
+
+## For developers: rebuild
+
+Use a venv of your **full local Python (with tkinter)**:
+
+```bash
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+# GUI single-file exe: double-click to open, no console window
+.venv\Scripts\pyinstaller.exe --windowed --onefile --name Image2JPG --hidden-import pillow_avif --hidden-import pillow_heif image2jpg.py
+
+# CLI single-file exe: console subsystem, prints to the current terminal
+.venv\Scripts\pyinstaller.exe --onefile --name Image2JPG-CLI --hidden-import pillow_avif --hidden-import pillow_heif image2jpg_cli.py
+```
+
+AVIF / HEIC builds require `--hidden-import pillow_avif --hidden-import pillow_heif`; otherwise the corresponding format fails at runtime due to a missing module.
+
+## License
+
+Open source under the MIT License, see [LICENSE](LICENSE).
