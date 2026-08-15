@@ -244,7 +244,7 @@ class App:
     def add_files(self):
         paths = filedialog.askopenfilenames(
             title="选择图片",
-            filetypes=[("图片文件", "*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.webp;*.tif;*.tiff;*.ico;*.ppm;*.pgm;*.tga"),
+            filetypes=[("图片文件", "*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.webp;*.tif;*.tiff;*.ico;*.ppm;*.pgm;*.tga;*.avif;*.heic;*.heif"),
                        ("所有文件", "*.*")],
         )
         if paths:

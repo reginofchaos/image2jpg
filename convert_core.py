@@ -30,7 +30,8 @@ except ImportError:
 SUPPORTED_EXT = {
     ".jpg", ".jpeg", ".jpe", ".png", ".bmp", ".gif", ".webp",
     ".tif", ".tiff", ".ico", ".ppm", ".pgm", ".pbm", ".pnm",
-    ".tga", ".dds", ".pcx", ".sgi", ".xbm", ".eps", ".im", ".heic", ".heif",
+    ".tga", ".dds", ".pcx", ".sgi", ".xbm", ".eps", ".im",
+    ".avif", ".heic", ".heif",
 }
 
 # 可选输出格式（顺序即下拉顺序，第一个为默认）
