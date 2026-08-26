@@ -196,25 +196,12 @@ class App:
         self.open_dir = BooleanVar(value=False)
         ttk.Checkbutton(frm_tog, text="转换完成后打开输出目录", variable=self.open_dir).pack(side="left", padx=4)
 
-        # 输出大小控制（两种互斥模式）
-        frm_size = ttk.LabelFrame(self.root, text="输出大小控制", padding=(8, 4, 8, 4))
+        # 目标大小范围（固定质量下自动缩放）
+        frm_size = ttk.LabelFrame(self.root, text="目标大小范围", padding=(8, 4, 8, 4))
         frm_size.pack(fill="x", padx=8, pady=(0, 4))
-
-        # 模式一：硬过滤（超出上限即删除，不保留）
-        self.size_filter_on = BooleanVar(value=False)
-        ttk.Checkbutton(frm_size, text="仅保留输出 ≤", variable=self.size_filter_on,
-                        command=self._toggle_size_filter).pack(anchor="w", padx=4)
-        frm_filter = ttk.Frame(frm_size)
-        frm_filter.pack(anchor="w", padx=24, pady=(0, 4))
-        self.max_kb = StringVar(value="200")
-        self.max_kb_entry = ttk.Entry(frm_filter, textvariable=self.max_kb, width=8, state="disabled")
-        self.max_kb_entry.pack(side="left", padx=2)
-        ttk.Label(frm_filter, text="KB 的图片（转换后超出该大小的图片将被删除，不保留）").pack(side="left")
-
-        # 模式二：自动压缩到目标大小范围（固定质量下自动缩放）
         self.target_on = BooleanVar(value=False)
         ttk.Checkbutton(frm_size, text="自动压缩到目标大小范围(KB)", variable=self.target_on,
-                        command=self._toggle_target).pack(anchor="w", padx=4, pady=(4, 0))
+                        command=self._toggle_target).pack(anchor="w", padx=4)
         frm_target = ttk.Frame(frm_size)
         frm_target.pack(anchor="w", padx=24, pady=(0, 4))
         ttk.Label(frm_target, text="最小").pack(side="left")
@@ -260,23 +247,10 @@ class App:
         self.resize_combo.configure(state=state)
         self.resize_entry.configure(state=state)
 
-    def _toggle_size_filter(self):
-        state = "normal" if self.size_filter_on.get() else "disabled"
-        self.max_kb_entry.configure(state=state)
-        if self.size_filter_on.get():
-            # 互斥：开启硬过滤时关闭目标大小模式
-            self.target_on.set(False)
-            self.min_kb_entry.configure(state="disabled")
-            self.max_kb_target_entry.configure(state="disabled")
-
     def _toggle_target(self):
         state = "normal" if self.target_on.get() else "disabled"
         self.min_kb_entry.configure(state=state)
         self.max_kb_target_entry.configure(state=state)
-        if self.target_on.get():
-            # 互斥：开启目标大小模式时关闭硬过滤
-            self.size_filter_on.set(False)
-            self.max_kb_entry.configure(state="disabled")
 
     # ---------------- 列表操作 ----------------
     def _add_to_list(self, path: str) -> int:
@@ -414,16 +388,7 @@ class App:
         rn_mode = RENAME_MODE_MAP.get(self.rename_mode.get(), "keep")
         rn_text = self.rename_text.get().strip()
 
-        # 输出大小过滤阈值（KB -> 字节；未勾选或非法输入则按 200KB 兜底）
-        max_bytes = 0
-        if self.size_filter_on.get():
-            try:
-                kb = float(self.max_kb.get())
-            except ValueError:
-                kb = 200
-            max_bytes = int(kb * 1024)
-
-        # 目标大小范围（固定质量自动缩放）：与硬过滤互斥
+        # 目标大小范围（固定质量自动缩放）
         target_on = False
         target_min = 50.0
         target_max = 200.0
@@ -443,15 +408,15 @@ class App:
         t = threading.Thread(
             target=self._worker,
             args=(order, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text,
-                  max_bytes, target_on, target_min, target_max),
+                  target_on, target_min, target_max),
             daemon=True,
         )
         t.start()
 
     def _worker(self, files, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text,
-                max_bytes, target_on=False, target_min=50.0, target_max=200.0):
+                target_on=False, target_min=50.0, target_max=200.0):
         total = len(files)
-        ok = fail = skipped = 0
+        ok = fail = 0
         seq = 0
         self.root.after(0, lambda: self.progress.configure(maximum=total, value=0))
         for idx, src in enumerate(files, 1):
@@ -467,29 +432,18 @@ class App:
                         src, str(dst), quality, fmt, target_min, target_max,
                         keep_exif=self.keep_exif.get(),
                     )
-                    stat = "完成 → " + os.path.basename(result)
-                    ok += 1
                 else:
                     result = core.convert_one(
                         src, str(dst), quality, fmt, resize,
                         keep_exif=self.keep_exif.get(),
                     )
-                    sz = os.path.getsize(result)
-                    if max_bytes > 0 and sz > max_bytes:
-                        try:
-                            os.remove(result)
-                        except OSError:
-                            pass
-                        stat = "跳过(>%.0fKB)" % (max_bytes / 1024)
-                        skipped += 1
-                    else:
-                        stat = "完成 → " + os.path.basename(result)
-                        ok += 1
+                stat = "完成 → " + os.path.basename(result)
+                ok += 1
             except Exception as e:
                 stat = "失败: " + str(e)[:50]
                 fail += 1
             self.root.after(0, self._apply_status, src, stat, idx, total)
-        self.root.after(0, self._finish, ok, fail, skipped)
+        self.root.after(0, self._finish, ok, fail)
 
     def _apply_status(self, src, stat, idx, total):
         iid = self.row_map.get(src)
@@ -500,13 +454,10 @@ class App:
         self.progress.configure(value=idx)
         self.status.set(f"转换中 {idx}/{total}")
 
-    def _finish(self, ok, fail, skipped=0):
+    def _finish(self, ok, fail):
         self.converting = False
         self.convert_btn.configure(state="normal")
-        parts = ["成功 %d 张" % ok]
-        if skipped:
-            parts.append("跳过 %d 张(超出大小)" % skipped)
-        parts.append("失败 %d 张" % fail)
+        parts = ["成功 %d 张" % ok, "失败 %d 张" % fail]
         self.status.set("完成：" + "，".join(parts))
         if getattr(self, "open_dir", None) and self.open_dir.get() and getattr(self, "_open_target", None):
             self._open_dir(self._open_target)
