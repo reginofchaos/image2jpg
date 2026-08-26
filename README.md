@@ -26,6 +26,8 @@
 - **保留 EXIF（可选）**：勾选「保留EXIF元数据」（或 CLI `--keep-exif`）后写回 JPG / WEBP / TIFF / HEIC 输出；开启时不自动按方向转正，以保留原始方向标签
 - **转换完成自动打开目录（可选）**：勾选「转换完成后打开输出目录」（或 CLI `--open`）
 - **输出可控**：默认输出到原图同目录；可勾选输出到指定文件夹
+- **按文件大小排序输出**：点击列表「大小」列头，可按文件体积升序/降序排列；再次点击切换方向。转换将**按列表当前顺序执行**（先排序再转换，即「按文件大小输出」）
+- **列表多选删除**：支持 Shift / Ctrl 多选，点「删除选中」按钮或按 `Delete` 键，可移除单个或多个待处理文件
 
 ## 界面预览
 
@@ -176,6 +178,8 @@ A local desktop app that **batch-converts images between formats with one click 
 - **Keep EXIF (optional)**: when "保留EXIF元数据" is checked (or CLI `--keep-exif`), EXIF is written back to JPG / WEBP / TIFF / HEIC output; auto-rotation is disabled so the original orientation tag is preserved
 - **Auto-open output folder (optional)**: check "转换完成后打开输出目录" (or CLI `--open`)
 - **Controllable output**: defaults to the source folder; can be redirected to a chosen folder
+- **Sort output by file size**: click the "大小 / Size" column header to sort the list by file size (ascending/descending); click again to toggle direction. Conversion runs **in the current list order**, so sorting first means "output by file size"
+- **Multi-select delete**: hold Shift / Ctrl to multi-select, then click "删除选中 / Remove selected" or press `Delete` to remove one or many pending files
 
 ## Screenshot
 

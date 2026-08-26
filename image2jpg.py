@@ -87,6 +87,10 @@ class App:
 
         self.files = []          # 待转换的绝对路径列表
         self.row_map = {}        # path -> tree iid
+        self.iid_to_path = {}    # tree iid -> path（用于选中删除与排序）
+        self.size_map = {}       # path -> 字节数（用于按大小排序）
+        self._sort_col = None
+        self._sort_rev = False
         self.converting = False
 
         self._build_ui()
@@ -101,6 +105,7 @@ class App:
         ttk.Button(frm_top, text="添加文件", command=self.add_files).pack(side="left", padx=4)
         ttk.Button(frm_top, text="添加文件夹", command=self.add_folder).pack(side="left", padx=4)
         ttk.Button(frm_top, text="清空列表", command=self.clear_list).pack(side="left", padx=4)
+        ttk.Button(frm_top, text="删除选中", command=self.remove_selected).pack(side="left", padx=4)
 
         ttk.Label(frm_top, text="输出格式:").pack(side="left", padx=(18, 4))
         self.fmt_var = StringVar(value="jpg")
@@ -125,10 +130,10 @@ class App:
         # 文件列表
         frm_list = ttk.Frame(self.root, padding=(8, 4, 8, 0))
         frm_list.pack(fill="both", expand=True)
-        self.tree = ttk.Treeview(frm_list, columns=("name", "size", "status"), show="headings")
-        self.tree.heading("name", text="文件名")
-        self.tree.heading("size", text="大小")
-        self.tree.heading("status", text="状态")
+        self.tree = ttk.Treeview(frm_list, columns=("name", "size", "status"), show="headings", selectmode="extended")
+        self.tree.heading("name", text="文件名", command=lambda: self._sort_tree("name"))
+        self.tree.heading("size", text="大小", command=lambda: self._sort_tree("size"))
+        self.tree.heading("status", text="状态", command=lambda: self._sort_tree("status"))
         self.tree.column("name", width=400)
         self.tree.column("size", width=100)
         self.tree.column("status", width=200)
@@ -136,6 +141,7 @@ class App:
         sb = ttk.Scrollbar(frm_list, orient="vertical", command=self.tree.yview)
         sb.pack(side="right", fill="y")
         self.tree.configure(yscrollcommand=sb.set)
+        self.tree.bind("<Delete>", lambda e: self.remove_selected())
 
         ttk.Label(self.root, text="提示：可直接把图片或文件夹拖入窗口", foreground="gray").pack(pady=(0, 6))
 
@@ -229,9 +235,11 @@ class App:
         if ap in self.files:
             return 0
         self.files.append(ap)
-        size = core.human_size(os.path.getsize(ap))
-        iid = self.tree.insert("", "end", values=(os.path.basename(ap), size, "等待"))
+        raw = os.path.getsize(ap)
+        self.size_map[ap] = raw
+        iid = self.tree.insert("", "end", values=(os.path.basename(ap), core.human_size(raw), "等待"))
         self.row_map[ap] = iid
+        self.iid_to_path[iid] = ap
         return 1
 
     def _collect(self, paths):
@@ -261,9 +269,51 @@ class App:
     def clear_list(self):
         self.files.clear()
         self.row_map.clear()
+        self.iid_to_path.clear()
+        self.size_map.clear()
+        self._sort_col = None
+        self._sort_rev = False
         for iid in self.tree.get_children():
             self.tree.delete(iid)
         self.status.set("已清空列表")
+
+    def _sort_tree(self, col):
+        """点击列头按该列排序；size 列按字节数数值排序，其余按文本。再次点击同一列切换升/降序。"""
+        if self._sort_col == col:
+            self._sort_rev = not self._sort_rev
+        else:
+            self._sort_col = col
+            self._sort_rev = False
+        children = self.tree.get_children("")
+        if col == "size":
+            data = [(self.size_map.get(self.iid_to_path.get(c, ""), 0), c) for c in children]
+        else:
+            data = [(self.tree.set(c, col), c) for c in children]
+        data.sort(key=lambda x: x[0], reverse=self._sort_rev)
+        for idx, (_, iid) in enumerate(data):
+            self.tree.move(iid, "", idx)
+        # 更新列头箭头提示当前排序方向
+        labels = {"name": "文件名", "size": "大小", "status": "状态"}
+        for c in ("name", "size", "status"):
+            arrow = ""
+            if self._sort_col == c:
+                arrow = " ▾" if self._sort_rev else " ▴"
+            self.tree.heading(c, text=labels[c] + arrow)
+
+    def remove_selected(self):
+        """删除列表中当前选中的单个或多个文件（支持 Shift/Ctrl 多选）。"""
+        sel = self.tree.selection()
+        if not sel:
+            return
+        for iid in sel:
+            ap = self.iid_to_path.get(iid)
+            if ap in self.files:
+                self.files.remove(ap)
+            self.row_map.pop(ap, None)
+            self.size_map.pop(ap, None)
+            self.iid_to_path.pop(iid, None)
+            self.tree.delete(iid)
+        self.status.set(f"已删除选中 {len(sel)} 张，列表剩 {len(self.files)} 张")
 
     # ---------------- 输出目录 ----------------
     def _toggle_out_dir(self):
@@ -280,9 +330,13 @@ class App:
     def start_convert(self):
         if self.converting:
             return
-        if not self.files:
+        # 按列表当前显示顺序（可先按大小/名称排序）作为转换顺序
+        order = [self.iid_to_path.get(iid) for iid in self.tree.get_children("")]
+        order = [f for f in order if f]
+        if not order:
             messagebox.showinfo("提示", "请先添加图片（拖入或点击按钮）。")
             return
+        self.files = order
         fmt = self.fmt_var.get()
         quality = self.quality.get() if fmt in core.LOSSY_FORMATS else 100
         use_custom = self.use_custom_dir.get()
@@ -295,7 +349,7 @@ class App:
         if use_custom and out_dir:
             self._open_target = out_dir
         else:
-            self._open_target = os.path.dirname(self.files[0]) if self.files else None
+            self._open_target = os.path.dirname(order[0]) if order else None
 
         # 缩放参数
         resize = None
@@ -315,17 +369,17 @@ class App:
         self.convert_btn.configure(state="disabled")
         t = threading.Thread(
             target=self._worker,
-            args=(fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text),
+            args=(order, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text),
             daemon=True,
         )
         t.start()
 
-    def _worker(self, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text):
-        total = len(self.files)
+    def _worker(self, files, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text):
+        total = len(files)
         ok = fail = 0
         seq = 0
         self.root.after(0, lambda: self.progress.configure(maximum=total, value=0))
-        for idx, src in enumerate(self.files, 1):
+        for idx, src in enumerate(files, 1):
             try:
                 rename = None
                 if rn_mode != "keep":
