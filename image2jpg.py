@@ -196,6 +196,17 @@ class App:
         self.open_dir = BooleanVar(value=False)
         ttk.Checkbutton(frm_tog, text="转换完成后打开输出目录", variable=self.open_dir).pack(side="left", padx=4)
 
+        # 输出大小过滤
+        frm_size = ttk.Frame(self.root, padding=(8, 0, 8, 4))
+        frm_size.pack(fill="x")
+        self.size_filter_on = BooleanVar(value=False)
+        ttk.Checkbutton(frm_size, text="仅保留输出 ≤", variable=self.size_filter_on,
+                        command=self._toggle_size_filter).pack(side="left", padx=4)
+        self.max_kb = StringVar(value="200")
+        self.max_kb_entry = ttk.Entry(frm_size, textvariable=self.max_kb, width=8, state="disabled")
+        self.max_kb_entry.pack(side="left", padx=2)
+        ttk.Label(frm_size, text="KB 的图片（转换后超出该大小的图片将被删除，不保留）").pack(side="left")
+
         # 底部：进度 + 转换按钮
         frm_bottom = ttk.Frame(self.root, padding=8)
         frm_bottom.pack(fill="x")
@@ -228,6 +239,10 @@ class App:
         state = "normal" if self.resize_on.get() else "disabled"
         self.resize_combo.configure(state=state)
         self.resize_entry.configure(state=state)
+
+    def _toggle_size_filter(self):
+        state = "normal" if self.size_filter_on.get() else "disabled"
+        self.max_kb_entry.configure(state=state)
 
     # ---------------- 列表操作 ----------------
     def _add_to_list(self, path: str) -> int:
@@ -365,18 +380,27 @@ class App:
         rn_mode = RENAME_MODE_MAP.get(self.rename_mode.get(), "keep")
         rn_text = self.rename_text.get().strip()
 
+        # 输出大小过滤阈值（KB -> 字节；未勾选或非法输入则按 200KB 兜底）
+        max_bytes = 0
+        if self.size_filter_on.get():
+            try:
+                kb = float(self.max_kb.get())
+            except ValueError:
+                kb = 200
+            max_bytes = int(kb * 1024)
+
         self.converting = True
         self.convert_btn.configure(state="disabled")
         t = threading.Thread(
             target=self._worker,
-            args=(order, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text),
+            args=(order, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text, max_bytes),
             daemon=True,
         )
         t.start()
 
-    def _worker(self, files, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text):
+    def _worker(self, files, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text, max_bytes):
         total = len(files)
-        ok = fail = 0
+        ok = fail = skipped = 0
         seq = 0
         self.root.after(0, lambda: self.progress.configure(maximum=total, value=0))
         for idx, src in enumerate(files, 1):
@@ -390,13 +414,22 @@ class App:
                     src, str(dst), quality, fmt, resize,
                     keep_exif=self.keep_exif.get(),
                 )
-                stat = "完成 → " + os.path.basename(result)
-                ok += 1
+                sz = os.path.getsize(result)
+                if max_bytes > 0 and sz > max_bytes:
+                    try:
+                        os.remove(result)
+                    except OSError:
+                        pass
+                    stat = "跳过(>%.0fKB)" % (max_bytes / 1024)
+                    skipped += 1
+                else:
+                    stat = "完成 → " + os.path.basename(result)
+                    ok += 1
             except Exception as e:
                 stat = "失败: " + str(e)[:50]
                 fail += 1
             self.root.after(0, self._apply_status, src, stat, idx, total)
-        self.root.after(0, self._finish, ok, fail)
+        self.root.after(0, self._finish, ok, fail, skipped)
 
     def _apply_status(self, src, stat, idx, total):
         iid = self.row_map.get(src)
@@ -407,13 +440,17 @@ class App:
         self.progress.configure(value=idx)
         self.status.set(f"转换中 {idx}/{total}")
 
-    def _finish(self, ok, fail):
+    def _finish(self, ok, fail, skipped=0):
         self.converting = False
         self.convert_btn.configure(state="normal")
-        self.status.set(f"完成：成功 {ok} 张，失败 {fail} 张")
+        parts = ["成功 %d 张" % ok]
+        if skipped:
+            parts.append("跳过 %d 张(超出大小)" % skipped)
+        parts.append("失败 %d 张" % fail)
+        self.status.set("完成：" + "，".join(parts))
         if getattr(self, "open_dir", None) and self.open_dir.get() and getattr(self, "_open_target", None):
             self._open_dir(self._open_target)
-        messagebox.showinfo("完成", f"转换完成\n成功 {ok} 张，失败 {fail} 张")
+        messagebox.showinfo("完成", "转换完成\n" + "\n".join(parts))
 
     @staticmethod
     def _open_dir(path):

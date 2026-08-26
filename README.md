@@ -28,6 +28,7 @@
 - **输出可控**：默认输出到原图同目录；可勾选输出到指定文件夹
 - **按文件大小排序输出**：点击列表「大小」列头，可按文件体积升序/降序排列；再次点击切换方向。转换将**按列表当前顺序执行**（先排序再转换，即「按文件大小输出」）
 - **列表多选删除**：支持 Shift / Ctrl 多选，点「删除选中」按钮或按 `Delete` 键，可移除单个或多个待处理文件
+- **按输出大小过滤**：勾选「仅保留输出 ≤ X KB」并填入阈值（如 200），转换后超出该大小的图片会被自动删除，只保留体积达标的输出（例如只输出小于 200KB 的图片）
 
 ## 界面预览
 
@@ -101,6 +102,7 @@ python -m venv .venv
 | `--keep-exif` | 保留源图 EXIF 元数据（JPG/WEBP/TIFF/HEIC 生效；开启后不自动按方向转正） |
 | `--open` | 转换完成后在资源管理器打开输出目录 |
 | `--workers N` | 并行线程数（默认 1） |
+| `--max-size KB` | 仅保留转换后 ≤ 指定 KB 的图片；超出该大小的输出文件将被删除（默认 0 不限制） |
 | `--dry-run` | 只列出计划，不实际转换 |
 | `--quiet` | 静默（仅输出错误） |
 | `--json` | 以 JSON 输出结果汇总（便于机器解析） |
@@ -180,6 +182,7 @@ A local desktop app that **batch-converts images between formats with one click 
 - **Controllable output**: defaults to the source folder; can be redirected to a chosen folder
 - **Sort output by file size**: click the "大小 / Size" column header to sort the list by file size (ascending/descending); click again to toggle direction. Conversion runs **in the current list order**, so sorting first means "output by file size"
 - **Multi-select delete**: hold Shift / Ctrl to multi-select, then click "删除选中 / Remove selected" or press `Delete` to remove one or many pending files
+- **Filter by output size**: check "仅保留输出 ≤ X KB / Keep output ≤ X KB" and set a threshold (e.g. 200). Results larger than the limit are auto-deleted, so only images under the size are kept (e.g. keep only pictures smaller than 200KB)
 
 ## Screenshot
 
@@ -253,6 +256,7 @@ Best for PowerShell, scripts, and CI — no internet required.
 | `--keep-exif` | Keep source EXIF metadata (JPG/WEBP/TIFF/HEIC; disables auto-rotation) |
 | `--open` | Open the output folder in Explorer when done |
 | `--workers N` | Parallel worker threads (default 1) |
+| `--max-size KB` | Keep only results ≤ the given KB after conversion; larger outputs are deleted (default 0 = no limit) |
 | `--dry-run` | List the plan only, do not convert |
 | `--quiet` | Quiet mode (errors only) |
 | `--json` | Emit a JSON summary (for machine parsing) |

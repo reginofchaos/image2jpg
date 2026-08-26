@@ -89,6 +89,8 @@ def build_parser():
                    help="只列出将要执行的转换，不实际生成文件")
     p.add_argument("--quiet", action="store_true", help="静默：仅输出错误与最终汇总")
     p.add_argument("--json", action="store_true", help="以 JSON 形式输出结果汇总")
+    p.add_argument("--max-size", type=int, default=0, metavar="KB",
+                   help="仅保留转换后 ≤ 指定 KB 的图片；超出该大小的输出文件将被删除（默认 0 不限制）")
     p.add_argument("--list-formats", action="store_true",
                    help="打印支持的输入输出格式后退出")
     p.add_argument("--version", action="version", version="image2jpg-cli 1.0")
@@ -175,17 +177,24 @@ def run_cli(argv=None):
         try:
             out = core.convert_one(src, dst, quality, args.format, args.resize,
                                    keep_exif=args.keep_exif)
-            return {"src": src, "dst": out, "ok": True, "error": None}
+            if args.max_size and args.max_size > 0 and os.path.getsize(out) > args.max_size * 1024:
+                sz = os.path.getsize(out)
+                os.remove(out)
+                return {"src": src, "dst": dst, "ok": True, "skipped": True,
+                        "error": "输出 %.0fKB 超过 %dKB 已删除" % (sz / 1024, args.max_size)}
+            return {"src": src, "dst": out, "ok": True, "skipped": False, "error": None}
         except Exception as e:
-            return {"src": src, "dst": dst, "ok": False, "error": str(e)}
+            return {"src": src, "dst": dst, "ok": False, "skipped": False, "error": str(e)}
 
     if workers <= 1:
         for item in plan:
             r = do(item)
             results.append(r)
             if verbose:
-                if r["ok"]:
+                if r["ok"] and not r.get("skipped"):
                     print(f"[OK]   {os.path.basename(r['src'])} -> {os.path.basename(r['dst'])}")
+                elif r["ok"] and r.get("skipped"):
+                    print(f"[SKIP] {os.path.basename(r['src'])}: {r['error']}")
                 else:
                     print(f"[FAIL] {os.path.basename(r['src'])}: {r['error']}")
     else:
@@ -195,20 +204,23 @@ def run_cli(argv=None):
                 r = f.result()
                 results.append(r)
                 if verbose:
-                    if r["ok"]:
+                    if r["ok"] and not r.get("skipped"):
                         print(f"[OK]   {os.path.basename(r['src'])} -> {os.path.basename(r['dst'])}")
+                    elif r["ok"] and r.get("skipped"):
+                        print(f"[SKIP] {os.path.basename(r['src'])}: {r['error']}")
                     else:
                         print(f"[FAIL] {os.path.basename(r['src'])}: {r['error']}")
 
-    ok = sum(1 for r in results if r["ok"])
-    fail = len(results) - ok
+    ok = sum(1 for r in results if r["ok"] and not r.get("skipped"))
+    skipped = sum(1 for r in results if r.get("skipped"))
+    fail = sum(1 for r in results if not r["ok"])
     total = len(results)
 
     if args.json:
-        print(json.dumps({"total": total, "ok": ok, "fail": fail, "results": results},
+        print(json.dumps({"total": total, "ok": ok, "skipped": skipped, "fail": fail, "results": results},
                          ensure_ascii=False, indent=2))
     elif not args.quiet:
-        print(f"\n完成：成功 {ok} 张，失败 {fail} 张，共 {total} 张。")
+        print(f"\n完成：成功 {ok} 张，跳过 {skipped} 张(超出大小)，失败 {fail} 张，共 {total} 张。")
 
     if args.open and results:
         first_ok = next((r for r in results if r["ok"]), None)
