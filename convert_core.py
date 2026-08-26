@@ -6,6 +6,8 @@ convert_core.py — 图片批量转换核心逻辑（不依赖 GUI / tkinter）�
 支持把图片批量转换为任意主流格式：jpg / png / webp / bmp / tiff / gif / ico / avif / heic。
 """
 import os
+import tempfile
+import shutil
 from pathlib import Path
 from PIL import Image, ImageOps, ImageFile
 
@@ -222,6 +224,66 @@ def convert_one(src: str, dst: str, quality: int = 100, fmt: str = "jpg",
             else:
                 raise
     return str(out)
+
+
+def convert_to_target_size(src: str, dst: str, quality: int = 100, fmt: str = "jpg",
+                           min_kb: float = 0, max_kb: float = 200,
+                           keep_exif: bool = False) -> str:
+    """
+    把单张图片转换为指定格式，并通过二分搜索缩放比例，使输出体积落入 [min_kb, max_kb] KB。
+
+    策略（固定质量不变）：
+      - 原图已在目标范围内 -> 原样输出（不缩放）。
+      - 原图已小于下限     -> 不放大，原样输出（避免无意义插值增大体积）。
+      - 原图超出上限       -> 二分搜索最长边缩放比例，取“不超过上限且尽量接近上限”的结果；
+                              若无论如何都超（极端情况），返回最接近上限的结果。
+    返回最终保存路径。
+    """
+    fmt = (fmt or "jpg").lower()
+    min_bytes = int(round(float(min_kb) * 1024))
+    max_bytes = int(round(float(max_kb) * 1024))
+    if min_bytes > max_bytes:
+        min_bytes, max_bytes = max_bytes, min_bytes
+
+    # 无上限时退化为普通转换
+    if max_bytes <= 0:
+        return convert_one(src, dst, quality, fmt, None, keep_exif=keep_exif)
+
+    tmpdir = tempfile.mkdtemp(prefix="img2jpg_")
+    try:
+        def _encode(scale_pct):
+            """在临时目录按指定百分比缩放后编码，返回 (路径, 字节数)。"""
+            tp = os.path.join(tmpdir, "tmp." + fmt)
+            resize = {"mode": "percent", "value": float(scale_pct)}
+            out = convert_one(src, tp, quality, fmt, resize, keep_exif=keep_exif)
+            return out, os.path.getsize(out)
+
+        # 原尺寸探测：先按 100% 转换看是否已在范围内
+        _, base_size = _encode(100.0)
+        if min_bytes <= base_size <= max_bytes:
+            return convert_one(src, dst, quality, fmt, None, keep_exif=keep_exif)
+        if base_size < min_bytes:
+            # 原图已小于下限：不放大，原样输出
+            return convert_one(src, dst, quality, fmt, None, keep_exif=keep_exif)
+
+        # 二分搜索：找到使输出 <= max_bytes 的最大缩放比例
+        lo, hi = 1.0, 100.0
+        best_scale = lo
+        for _ in range(20):
+            mid = (lo + hi) / 2.0
+            _, sz = _encode(mid)
+            if sz <= max_bytes:
+                best_scale = mid      # 可行：记录并继续尝试更大的比例（更接近上限）
+                lo = mid
+            else:
+                hi = mid              # 超出上限：需要更小的比例
+        return convert_one(
+            src, dst, quality, fmt,
+            {"mode": "percent", "value": float(best_scale)},
+            keep_exif=keep_exif,
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def collect_images(paths, recursive=True) -> list:

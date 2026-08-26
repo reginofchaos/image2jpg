@@ -196,16 +196,36 @@ class App:
         self.open_dir = BooleanVar(value=False)
         ttk.Checkbutton(frm_tog, text="转换完成后打开输出目录", variable=self.open_dir).pack(side="left", padx=4)
 
-        # 输出大小过滤
-        frm_size = ttk.Frame(self.root, padding=(8, 0, 8, 4))
-        frm_size.pack(fill="x")
+        # 输出大小控制（两种互斥模式）
+        frm_size = ttk.LabelFrame(self.root, text="输出大小控制", padding=(8, 4, 8, 4))
+        frm_size.pack(fill="x", padx=8, pady=(0, 4))
+
+        # 模式一：硬过滤（超出上限即删除，不保留）
         self.size_filter_on = BooleanVar(value=False)
         ttk.Checkbutton(frm_size, text="仅保留输出 ≤", variable=self.size_filter_on,
-                        command=self._toggle_size_filter).pack(side="left", padx=4)
+                        command=self._toggle_size_filter).pack(anchor="w", padx=4)
+        frm_filter = ttk.Frame(frm_size)
+        frm_filter.pack(anchor="w", padx=24, pady=(0, 4))
         self.max_kb = StringVar(value="200")
-        self.max_kb_entry = ttk.Entry(frm_size, textvariable=self.max_kb, width=8, state="disabled")
+        self.max_kb_entry = ttk.Entry(frm_filter, textvariable=self.max_kb, width=8, state="disabled")
         self.max_kb_entry.pack(side="left", padx=2)
-        ttk.Label(frm_size, text="KB 的图片（转换后超出该大小的图片将被删除，不保留）").pack(side="left")
+        ttk.Label(frm_filter, text="KB 的图片（转换后超出该大小的图片将被删除，不保留）").pack(side="left")
+
+        # 模式二：自动压缩到目标大小范围（固定质量下自动缩放）
+        self.target_on = BooleanVar(value=False)
+        ttk.Checkbutton(frm_size, text="自动压缩到目标大小范围(KB)", variable=self.target_on,
+                        command=self._toggle_target).pack(anchor="w", padx=4, pady=(4, 0))
+        frm_target = ttk.Frame(frm_size)
+        frm_target.pack(anchor="w", padx=24, pady=(0, 4))
+        ttk.Label(frm_target, text="最小").pack(side="left")
+        self.min_kb = StringVar(value="50")
+        self.min_kb_entry = ttk.Entry(frm_target, textvariable=self.min_kb, width=8, state="disabled")
+        self.min_kb_entry.pack(side="left", padx=2)
+        ttk.Label(frm_target, text="KB  ~  最大").pack(side="left")
+        self.max_kb_target = StringVar(value="200")
+        self.max_kb_target_entry = ttk.Entry(frm_target, textvariable=self.max_kb_target, width=8, state="disabled")
+        self.max_kb_target_entry.pack(side="left", padx=2)
+        ttk.Label(frm_target, text="KB（固定质量自动缩放，使输出体积落入该范围；原图已更小则不放大）").pack(side="left")
 
         # 底部：进度 + 转换按钮
         frm_bottom = ttk.Frame(self.root, padding=8)
@@ -243,6 +263,20 @@ class App:
     def _toggle_size_filter(self):
         state = "normal" if self.size_filter_on.get() else "disabled"
         self.max_kb_entry.configure(state=state)
+        if self.size_filter_on.get():
+            # 互斥：开启硬过滤时关闭目标大小模式
+            self.target_on.set(False)
+            self.min_kb_entry.configure(state="disabled")
+            self.max_kb_target_entry.configure(state="disabled")
+
+    def _toggle_target(self):
+        state = "normal" if self.target_on.get() else "disabled"
+        self.min_kb_entry.configure(state=state)
+        self.max_kb_target_entry.configure(state=state)
+        if self.target_on.get():
+            # 互斥：开启目标大小模式时关闭硬过滤
+            self.size_filter_on.set(False)
+            self.max_kb_entry.configure(state="disabled")
 
     # ---------------- 列表操作 ----------------
     def _add_to_list(self, path: str) -> int:
@@ -389,16 +423,33 @@ class App:
                 kb = 200
             max_bytes = int(kb * 1024)
 
+        # 目标大小范围（固定质量自动缩放）：与硬过滤互斥
+        target_on = False
+        target_min = 50.0
+        target_max = 200.0
+        if self.target_on.get():
+            try:
+                target_min = float(self.min_kb.get())
+            except ValueError:
+                target_min = 50.0
+            try:
+                target_max = float(self.max_kb_target.get())
+            except ValueError:
+                target_max = 200.0
+            target_on = True
+
         self.converting = True
         self.convert_btn.configure(state="disabled")
         t = threading.Thread(
             target=self._worker,
-            args=(order, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text, max_bytes),
+            args=(order, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text,
+                  max_bytes, target_on, target_min, target_max),
             daemon=True,
         )
         t.start()
 
-    def _worker(self, files, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text, max_bytes):
+    def _worker(self, files, fmt, quality, use_custom, out_dir, resize, rn_mode, rn_text,
+                max_bytes, target_on=False, target_min=50.0, target_max=200.0):
         total = len(files)
         ok = fail = skipped = 0
         seq = 0
@@ -410,21 +461,30 @@ class App:
                     seq += 1
                     rename = {"mode": rn_mode, "text": rn_text or "img", "index": seq}
                 dst = core.plan_dst(src, use_custom, out_dir, fmt, rename)
-                result = core.convert_one(
-                    src, str(dst), quality, fmt, resize,
-                    keep_exif=self.keep_exif.get(),
-                )
-                sz = os.path.getsize(result)
-                if max_bytes > 0 and sz > max_bytes:
-                    try:
-                        os.remove(result)
-                    except OSError:
-                        pass
-                    stat = "跳过(>%.0fKB)" % (max_bytes / 1024)
-                    skipped += 1
-                else:
+                if target_on:
+                    # 目标大小范围模式：固定质量，自动缩放使体积落入 [min, max]
+                    result = core.convert_to_target_size(
+                        src, str(dst), quality, fmt, target_min, target_max,
+                        keep_exif=self.keep_exif.get(),
+                    )
                     stat = "完成 → " + os.path.basename(result)
                     ok += 1
+                else:
+                    result = core.convert_one(
+                        src, str(dst), quality, fmt, resize,
+                        keep_exif=self.keep_exif.get(),
+                    )
+                    sz = os.path.getsize(result)
+                    if max_bytes > 0 and sz > max_bytes:
+                        try:
+                            os.remove(result)
+                        except OSError:
+                            pass
+                        stat = "跳过(>%.0fKB)" % (max_bytes / 1024)
+                        skipped += 1
+                    else:
+                        stat = "完成 → " + os.path.basename(result)
+                        ok += 1
             except Exception as e:
                 stat = "失败: " + str(e)[:50]
                 fail += 1

@@ -29,6 +29,7 @@
 - **按文件大小排序输出**：点击列表「大小」列头，可按文件体积升序/降序排列；再次点击切换方向。转换将**按列表当前顺序执行**（先排序再转换，即「按文件大小输出」）
 - **列表多选删除**：支持 Shift / Ctrl 多选，点「删除选中」按钮或按 `Delete` 键，可移除单个或多个待处理文件
 - **按输出大小过滤**：勾选「仅保留输出 ≤ X KB」并填入阈值（如 200），转换后超出该大小的图片会被自动删除，只保留体积达标的输出（例如只输出小于 200KB 的图片）
+- **自动压缩到目标大小范围**：勾选「自动压缩到目标大小范围(KB)」并填入最小/最大 KB（如 50 / 200），程序在固定质量下自动二分搜索缩放比例，使输出体积落入该范围；若原图已小于下限则不放大。与「仅保留输出 ≤」二选一（互斥）
 
 ## 界面预览
 
@@ -79,6 +80,9 @@ python -m venv .venv
 
 # 以 JSON 输出结果，便于程序解析
 .\dist\Image2JPG-CLI.exe D:\photos\ -f png --json
+
+# 自动压缩到 50~200KB 范围（固定质量自动缩放，使输出落入该区间）
+.\dist\Image2JPG-CLI.exe D:\photos\ -f jpg --target-size 50 200
 ```
 
 #### 用 Python 源码调用
@@ -103,6 +107,7 @@ python -m venv .venv
 | `--open` | 转换完成后在资源管理器打开输出目录 |
 | `--workers N` | 并行线程数（默认 1） |
 | `--max-size KB` | 仅保留转换后 ≤ 指定 KB 的图片；超出该大小的输出文件将被删除（默认 0 不限制） |
+| `--target-size MIN MAX` | 自动压缩到目标大小范围 [MIN, MAX] KB：固定质量下自动缩放，使输出体积落入该范围；原图已更小则不放大（与 `--max-size` 互斥） |
 | `--dry-run` | 只列出计划，不实际转换 |
 | `--quiet` | 静默（仅输出错误） |
 | `--json` | 以 JSON 输出结果汇总（便于机器解析） |
@@ -117,7 +122,10 @@ python -m venv .venv
 3. （可选）勾选「缩放与重命名」区的「启用缩放」，选模式填数值（% 或 px，等比）
 4. （可选）在「缩放与重命名」区选「重命名」模式并填文本（序号模式会按列表顺序编号）
 5. （可选）勾选「输出到指定文件夹」并选择目标目录
-6. 点「一键转换为 XXX」，等待进度完成
+6. （可选）在「输出大小控制」区二选一：
+   - 「仅保留输出 ≤ X KB」：超出阈值的图片会被删除（只保留达标图片）
+   - 「自动压缩到目标大小范围(KB)」：填最小/最大 KB，程序固定质量自动缩放，使输出落入该范围
+7. 点「一键转换为 XXX」，等待进度完成
 
 ## 文件说明
 
@@ -183,6 +191,7 @@ A local desktop app that **batch-converts images between formats with one click 
 - **Sort output by file size**: click the "大小 / Size" column header to sort the list by file size (ascending/descending); click again to toggle direction. Conversion runs **in the current list order**, so sorting first means "output by file size"
 - **Multi-select delete**: hold Shift / Ctrl to multi-select, then click "删除选中 / Remove selected" or press `Delete` to remove one or many pending files
 - **Filter by output size**: check "仅保留输出 ≤ X KB / Keep output ≤ X KB" and set a threshold (e.g. 200). Results larger than the limit are auto-deleted, so only images under the size are kept (e.g. keep only pictures smaller than 200KB)
+- **Auto-compress to a target size range**: check "自动压缩到目标大小范围(KB) / Auto-compress to target size range (KB)" and set the min/max KB (e.g. 50 / 200). The app runs a binary search on the scale factor at the fixed quality so the output lands within the range; originals already smaller than the lower bound are not upscaled. Mutually exclusive with "仅保留输出 ≤ / Keep output ≤"
 
 ## Screenshot
 
@@ -233,6 +242,9 @@ Best for PowerShell, scripts, and CI — no internet required.
 
 # Output results as JSON for programmatic parsing
 .\dist\Image2JPG-CLI.exe D:\photos\ -f png --json
+
+# Auto-compress into the 50~200KB range (fixed quality, scales automatically)
+.\dist\Image2JPG-CLI.exe D:\photos\ -f jpg --target-size 50 200
 ```
 
 #### Using the Python source
@@ -257,6 +269,7 @@ Best for PowerShell, scripts, and CI — no internet required.
 | `--open` | Open the output folder in Explorer when done |
 | `--workers N` | Parallel worker threads (default 1) |
 | `--max-size KB` | Keep only results ≤ the given KB after conversion; larger outputs are deleted (default 0 = no limit) |
+| `--target-size MIN MAX` | Auto-compress into the target size range [MIN, MAX] KB: scales at the fixed quality so the output lands in range; originals already smaller are not upscaled (mutually exclusive with `--max-size`) |
 | `--dry-run` | List the plan only, do not convert |
 | `--quiet` | Quiet mode (errors only) |
 | `--json` | Emit a JSON summary (for machine parsing) |
@@ -271,7 +284,10 @@ Best for PowerShell, scripts, and CI — no internet required.
 3. (Optional) Enable "启用缩放" in the resize/rename area, choose a mode and value (% or px, proportional)
 4. (Optional) Choose a rename mode and enter text (sequence mode numbers files in list order)
 5. (Optional) Check "输出到指定文件夹" and pick a target directory
-6. Click "一键转换为 XXX" and wait for the progress to finish
+6. (Optional) In the "输出大小控制 / Output size control" area, pick one of two modes:
+   - "仅保留输出 ≤ X KB / Keep output ≤ X KB": oversized results are deleted (only in-range images kept)
+   - "自动压缩到目标大小范围(KB) / Auto-compress to target size range (KB)": enter min/max KB; the app auto-scales at the fixed quality so the output lands in range
+7. Click "一键转换为 XXX" and wait for the progress to finish
 
 ## File reference
 

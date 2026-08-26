@@ -89,8 +89,11 @@ def build_parser():
                    help="只列出将要执行的转换，不实际生成文件")
     p.add_argument("--quiet", action="store_true", help="静默：仅输出错误与最终汇总")
     p.add_argument("--json", action="store_true", help="以 JSON 形式输出结果汇总")
-    p.add_argument("--max-size", type=int, default=0, metavar="KB",
+    grp_size = p.add_mutually_exclusive_group()
+    grp_size.add_argument("--max-size", type=int, default=0, metavar="KB",
                    help="仅保留转换后 ≤ 指定 KB 的图片；超出该大小的输出文件将被删除（默认 0 不限制）")
+    grp_size.add_argument("--target-size", type=int, nargs=2, metavar=("MIN", "MAX"), default=None,
+                   help="自动压缩到目标大小范围 [MIN, MAX] KB：固定质量下自动缩放，使输出体积落入该范围；原图已更小则不放大")
     p.add_argument("--list-formats", action="store_true",
                    help="打印支持的输入输出格式后退出")
     p.add_argument("--version", action="version", version="image2jpg-cli 1.0")
@@ -175,6 +178,11 @@ def run_cli(argv=None):
     def do(item):
         src, dst = item
         try:
+            if args.target_size:
+                mn, mx = args.target_size
+                out = core.convert_to_target_size(src, dst, quality, args.format, mn, mx,
+                                                  keep_exif=args.keep_exif)
+                return {"src": src, "dst": out, "ok": True, "skipped": False, "error": None}
             out = core.convert_one(src, dst, quality, args.format, args.resize,
                                    keep_exif=args.keep_exif)
             if args.max_size and args.max_size > 0 and os.path.getsize(out) > args.max_size * 1024:
